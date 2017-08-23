@@ -2,6 +2,7 @@ package com.example.aasir.reddit;
 
 import com.example.aasir.reddit.model.Account.Login;
 import com.example.aasir.reddit.model.RedditFeed;
+import com.example.aasir.reddit.model.comment.CheckComment;
 
 import java.util.Map;
 
@@ -28,8 +29,16 @@ public interface RedditAPI {
             @HeaderMap Map<String, String> headers,
             @Path("user") String username,
             @Query("user") String user,
-            @Query("password") String password,
+            @Query("passwd") String password,
             @Query("api_type") String type
+    );
+
+    @POST("{comment}")
+    Call<CheckComment> submitComment(
+            @HeaderMap Map<String, String> headers,
+            @Path("comment") String username,
+            @Query("parent") String user,
+            @Query("amp;text") String text
     );
 
 }

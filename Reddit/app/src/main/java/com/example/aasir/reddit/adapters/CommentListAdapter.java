@@ -49,10 +49,10 @@ public class CommentListAdapter extends RecyclerView.Adapter<CommentListAdapter.
                 .inflate(R.layout.card_layout_comment, parent, false);
         ReactiveCommentViewHolder holder = new ReactiveCommentViewHolder(postView);
 
-//        RxView.clicks(postView)
-//                .takeUntil(RxView.detaches(parent))
-//                .map(aVoid -> holder.getCurrentComment())
-//                .subscribe(onClickComment);
+        RxView.clicks(postView)
+                .takeUntil(RxView.detaches(parent))
+                .map(aVoid -> holder.getCurrentComment())
+                .subscribe(onClickComment);
 
         return holder;
     }

@@ -5,4 +5,10 @@
     <string name="post_title">post_title</string>
     <string name="post_author">post_author</string>
     <string name="post_updated">post_updated</string>
+    <string name="post_id">post_id</string>
+
+    <string name="session_username">com.example.aasir.reddit.sessionUsername</string>
+    <string name="session_modhash">com.example.aasir.reddit.sessionModhash</string>
+    <string name="session_cookie">com.example.aasir.reddit.sessionCookie</string>
+
 </resources>

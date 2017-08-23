@@ -60,6 +60,7 @@ public class MainActivity extends AppCompatActivity {
 
         Logger.addLogAdapter(new AndroidLogAdapter());
 
+        initToolbar();
         initView();
         loadRedditFeed();
 
@@ -71,11 +72,7 @@ public class MainActivity extends AppCompatActivity {
         return true;
     }
 
-    /**
-     * Initializing the Main Activity View
-     */
-    private void initView(){
-
+    private void initToolbar(){
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbarMain);
         setSupportActionBar(toolbar);
 
@@ -89,8 +86,12 @@ public class MainActivity extends AppCompatActivity {
             }
             return false;
         });
+    }
 
-
+    /**
+     * Initializing the Main Activity View
+     */
+    private void initView(){
         mRecyclerView = (RecyclerView) findViewById(R.id.recyclerView);
         mRecyclerView.setHasFixedSize(true);
 
@@ -138,13 +139,15 @@ public class MainActivity extends AppCompatActivity {
                         entries.get(i).getAuthor().getName(),
                         entries.get(i).getUpdated(),
                         postContent.get(0),
-                        imgLink));
+                        imgLink,
+                        entries.get(i).getId()));
             } catch (NullPointerException e){
                 mPosts.add(new Post(entries.get(i).getTitle(),
                         "None",
                         entries.get(i).getUpdated(),
                         postContent.get(0),
-                        imgLink));
+                        imgLink,
+                        entries.get(i).getId()));
                 Log.e(TAG, "handleResponse: NullPointerException: " + e.getMessage());
             }
         }
@@ -160,6 +163,7 @@ public class MainActivity extends AppCompatActivity {
                     intent.putExtra(getResources().getString(R.string.post_url), post.getPostURl());
                     intent.putExtra(getResources().getString(R.string.post_thumbnail), post.getThumbnailURL());
                     intent.putExtra(getResources().getString(R.string.post_updated), post.getDate_updated());
+                    intent.putExtra(getResources().getString(R.string.post_id), post.getId());
                     startActivity(intent);
                 });
         mRecyclerView.setAdapter(mAdapter);

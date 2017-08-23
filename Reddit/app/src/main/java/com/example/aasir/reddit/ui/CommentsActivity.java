@@ -2,7 +2,9 @@ package com.example.aasir.reddit.ui;
 
 import android.app.Dialog;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.LinearLayoutManager;
@@ -11,6 +13,7 @@ import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.Menu;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -20,6 +23,7 @@ import com.example.aasir.reddit.RedditAPI;
 import com.example.aasir.reddit.adapters.CommentListAdapter;
 import com.example.aasir.reddit.model.ParseXML;
 import com.example.aasir.reddit.model.RedditFeed;
+import com.example.aasir.reddit.model.comment.CheckComment;
 import com.example.aasir.reddit.model.comment.Comment;
 import com.example.aasir.reddit.model.entry.Entry;
 import com.example.aasir.reddit.utils.URLs;
@@ -28,12 +32,17 @@ import com.orhanobut.logger.Logger;
 import com.squareup.picasso.Picasso;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 import io.reactivex.Observable;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.schedulers.Schedulers;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 import retrofit2.Retrofit;
+import retrofit2.converter.gson.GsonConverterFactory;
 import retrofit2.converter.simplexml.SimpleXmlConverterFactory;
 
 /**
@@ -43,13 +52,17 @@ import retrofit2.converter.simplexml.SimpleXmlConverterFactory;
 public class CommentsActivity extends AppCompatActivity {
     private static final String TAG = "CommentsActivity";
 
-
     private static String postURL;
     private static String postThumbnailURL;
     private static String postTitle;
     private static String postAuthor;
     private static String postUpdated;
+    private static String postId;
     private static String currentPostURL;
+
+    private String username;
+    private String modhash;
+    private String cookie;
 
     private RedditAPI commentFeedAPI;
 
@@ -64,9 +77,17 @@ public class CommentsActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_comments);
 
+        initToolbar();
         initView();
         initPost();
         createRedditCommentAPI();
+    }
+
+    @Override
+    protected void onPostResume() {
+        super.onPostResume();
+        Log.d(TAG, "onPostResume");
+        loadSessionParams();
     }
 
     @Override
@@ -75,8 +96,23 @@ public class CommentsActivity extends AppCompatActivity {
         return true;
     }
 
-    private void initView(){
+    private void initToolbar(){
+        Toolbar toolbar = (Toolbar) findViewById(R.id.toolbarMain);
+        setSupportActionBar(toolbar);
 
+        toolbar.setOnMenuItemClickListener(item -> {
+            Log.d(TAG, "onMenuClicked: " + item);
+            switch (item.getItemId()){
+                case R.id.navLogin:
+                    Intent intent = new Intent(CommentsActivity.this, LoginActivity.class);
+                    startActivity(intent);
+                    break;
+            }
+            return false;
+        });
+    }
+
+    private void initView(){
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbarMain);
         setSupportActionBar(toolbar);
 
@@ -104,7 +140,7 @@ public class CommentsActivity extends AppCompatActivity {
         postTitle = incomingIntent.getStringExtra(getResources().getString(R.string.post_title));
         postThumbnailURL = incomingIntent.getStringExtra(getResources().getString(R.string.post_thumbnail));
         postUpdated = incomingIntent.getStringExtra(getResources().getString(R.string.post_updated));
-
+        postId = incomingIntent.getStringExtra(getResources().getString(R.string.post_id));
         postURL = incomingIntent.getStringExtra(getResources().getString(R.string.post_url));
 
         Log.d(TAG, "initPost Before Split: " + postURL);
@@ -134,7 +170,7 @@ public class CommentsActivity extends AppCompatActivity {
 
         btnReply.setOnClickListener(v -> {
             Log.d(TAG, "Reply Button Clicked: ");
-            postCommentDialog();
+            postCommentDialog(postId);
         });
 
         thumbnail.setOnClickListener(v -> {
@@ -146,7 +182,7 @@ public class CommentsActivity extends AppCompatActivity {
     }
 
 
-    private void postCommentDialog(){
+    private void postCommentDialog(String postID){
         final Dialog dialog = new Dialog(CommentsActivity.this);
         dialog.setContentView(R.layout.dialog_comment_add);
 
@@ -155,6 +191,55 @@ public class CommentsActivity extends AppCompatActivity {
 
         dialog.getWindow().setLayout(weight, height);
         dialog.show();
+
+        Button btnPostComment = (Button) dialog.findViewById(R.id.btnPostComment);
+        final EditText comment = (EditText) dialog.findViewById(R.id.dialogComment);
+
+        btnPostComment.setOnClickListener(v -> {
+            Log.d(TAG, "postCommentDialog: ");
+
+            //Retrofit for Commenting
+            Retrofit retrofit = new Retrofit.Builder()
+                    .baseUrl(URLs.COMMENT_URL)
+                    .addConverterFactory(GsonConverterFactory.create())
+                    .build();
+
+            RedditAPI redditAPI = retrofit.create(RedditAPI.class);
+            HashMap<String, String> headerMap = new HashMap<>();
+            headerMap.put("User-Agent", username);
+            headerMap.put("X-Modhash", modhash);
+            headerMap.put("cookie", "reddit_session=" + cookie);
+
+            Call<CheckComment> call = redditAPI.submitComment(headerMap, "comment", postID, comment.getText().toString());
+            call.enqueue(new Callback<CheckComment>() {
+                @Override
+                public void onResponse(Call<CheckComment> call, Response<CheckComment> response) {
+                    try{
+                        Log.d(TAG, "onResponse: " + response.toString());
+                        String commentSuccess = response.body().getSuccess();
+
+                        if (commentSuccess.equals("true")){
+                            dialog.dismiss();
+                            Toast.makeText(CommentsActivity.this, "Post Successful", Toast.LENGTH_SHORT).show();
+                        }
+                        else {
+                            Toast.makeText(CommentsActivity.this, "An Error Occurred. Did you Login?", Toast.LENGTH_SHORT).show();
+                        }
+
+                    }catch (NullPointerException e){
+                        Log.e(TAG, "onResponse: " + e.getMessage());
+                    }
+                }
+
+                @Override
+                public void onFailure(Call<CheckComment> call, Throwable t) {
+                    Log.e(TAG, "onFailure" + t.getMessage());
+                }
+            });
+
+        });
+
+
     }
 
 
@@ -177,9 +262,7 @@ public class CommentsActivity extends AppCompatActivity {
 
     private void handleResponse(RedditFeed redditFeed){
         List<Entry> entries = redditFeed.getEntries();
-        Log.d(TAG, "handleResponse: ");
-
-
+        Log.d(TAG, "handleResponse");
 
         comments = new ArrayList<>();
         for(int i = 1; i < entries.size(); i++) {
@@ -210,16 +293,15 @@ public class CommentsActivity extends AppCompatActivity {
                 ));
                 Log.e(TAG, "handleResponse: NullPointerException: " + e.getMessage());
             }
-
         }
 
             Observable<List<Comment>> observable = Observable.fromArray(comments);
             mAdapter = new CommentListAdapter(observable);
 
-
-//        mAdapter.getPostClickedObservable()
-//                .subscribe(comment -> {
-//                });
+        mAdapter.getCommentClickedObservable()
+                .subscribe(comment -> {
+                    postCommentDialog(comment.getId());
+                });
 
         mRecyclerView.setAdapter(mAdapter);
     }
@@ -228,4 +310,23 @@ public class CommentsActivity extends AppCompatActivity {
         Logger.e("onFailure: Unable to retrieve RSS: " + error.getMessage());
         Toast.makeText(CommentsActivity.this, "An Error Occurred", Toast.LENGTH_LONG).show();
     }
+
+    /**
+     * Loading the session params if user is logged in.
+     */
+    private void loadSessionParams(){
+        SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(CommentsActivity.this);
+
+        username = preferences.getString("@string/session_username", "");
+        modhash = preferences.getString("@string/session_modhash", "");
+        cookie = preferences.getString("@string/session_cookie", "");
+
+        Log.d(TAG, "saveSessionParams: Session Variables: \n" +
+                "username: " + username + "\n" +
+                "modhash: " + modhash + "\n" +
+                "cookie: " + cookie + "\n");
+
+    }
+
+
 }
